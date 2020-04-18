@@ -1,6 +1,8 @@
 from bs4 import BeautifulSoup
 import requests
 
+from selenium import webdriver
+
 import datetime as dt
 import numpy as np
 import matplotlib.pyplot as plt 
@@ -20,27 +22,7 @@ urls = ['https://finance.yahoo.com/cryptocurrencies', 'https://finance.yahoo.com
 #https://finance.yahoo.com/calendar
 #https://finance.yahoo.com/currency-converter
 
-headers = {
-		"Accept":"text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8",
-        "Accept-Encoding":"gzip, deflate",
-        "Accept-Language":"en-GB,en;q=0.9,en-US;q=0.8,ml;q=0.7",
-        "Connection":"keep-alive",
-        "Host":"www.nasdaq.com",
-        "Referer":"http://www.nasdaq.com",
-        "Upgrade-Insecure-Requests":"1",
-        "User-Agent":"Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/64.0.3282.119 Safari/537.36"
-        }
-
-
-def downloadHist(ticker='AMZN', startY=2015, startM=1, startD=1, endY=2020, endM=1, endD=1):
-	style.use('ggplot')
-
-	start = dt.datetime(startY, startM, startD)
-	end = dt.datetime(endY, endM, endD)
-
-	df = web.DataReader(ticker, 'yahoo', start, end)
-	df.to_csv(f'{ticker}History.csv')
-	
+header = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/61.0.3163.100 Safari/537.36'}
 
 #scrapes yfinance ranking tables
 def getTopData(url='https://finance.yahoo.com/most-active'):
@@ -52,7 +34,7 @@ def getTopData(url='https://finance.yahoo.com/most-active'):
 	numRows = 0
 	with open('topData.csv', 'w', newline='') as file:
 		writer = csv.writer(file)
-		writer.writerow(['#','Link', 'Ticker', 'Name', 'Price', 'Market Time', 'Change', '%Change', 'Volume', 'Avg Vol(3m)', 'Market Cap', 'Intraday High/Low', '52 Week Range'])
+		writer.writerow(['#','Link', 'Ticker', 'Name', 'Price', 'Market Time', '%Change', 'Change', 'Volume', 'Avg Vol(3m)', 'Market Cap', 'Intraday High/Low', '52 Week Range'])
 		for row in body.find_all('tr'):
 
 			numRows+=1
@@ -74,43 +56,144 @@ def getTopData(url='https://finance.yahoo.com/most-active'):
 			writer.writerow([numRows, link, ticker, name, price, marketTime, change, percentChange, volume, avgVolMon, marketCap, intraDay, weekrange])
 
 
-def getIndivData(quote):
-	url = 'https://finance.yahoo.com/quote/CCL?p=CCL'
-	r = requests.get(url)
-	soup = BeautifulSoup(r.text, 'lxml')
+'''functions that return current quotes'''
+def lastStockPrice(ticker):
+    url = f'https://finance.yahoo.com/quote/{ticker}?p={ticker}&.tsrc=fin-srch'    
+    r = requests.get(url, headers=header)
+    soup = BeautifulSoup(r.text, 'lxml')
+    price = soup.find('span', class_='Trsdu(0.3s) Fw(b) Fz(36px) Mb(-4px) D(ib)')
+    return price.text
+
+def currentChange(ticker):
+    url = f'https://finance.yahoo.com/quote/{ticker}?p={ticker}&.tsrc=fin-srch'    
+    r = requests.get(url, headers=header)
+    soup = BeautifulSoup(r.text, 'lxml')
+    price = soup.find('span', class_='Trsdu(0.3s) Fw(b) Fz(36px) Mb(-4px) D(ib)')
+    change = price.next_sibling
+    return change.text
 
 
+'''Functions that get individual data and write to csv'''
+def getHistory(ticker='AMD', startY=2015, startM=1, startD=1):
+    start = dt.datetime(startY, startM, startD)
+    end = dt.date.today()
+    df = web.DataReader(ticker, 'yahoo', start, end)
+    df.to_csv(f'{ticker}History.csv')
 
-def lastStockPrice(ticker):#Scrapes correct area but there is some block in place that doesn't let me scrape the price
-	url = f'https://www.nasdaq.com/market-activity/stocks/{ticker}/latest-real-time-trades'
-	r = requests.get(url,headers=headers)
-	soup = BeautifulSoup(r.text, 'lxml')
+def getSummary(ticker):
+    url = f'https://finance.yahoo.com/quote/{ticker}?p={ticker}&.tsrc=fin-srch'
+    r = requests.get(url, headers=header)
+    soup = BeautifulSoup(r.text, 'lxml')
+    with open('summary.csv', 'w', newline='') as file:
+        writer = csv.writer(file)
+        writer.writerow([ticker, 'Data'])
+        
+        pattern = soup.find('span', class_='Fw(b) D(b)--mobp C($positiveColor)').text
+        writer.writerow(['Pattern', pattern])
+        
+        prevClose = soup.tr.find('span', class_='Trsdu(0.3s)').text
+        writer.writerow(['Previous Close', prevClose])
+        
+        Open = soup.tr.next_sibling.find('span', class_='Trsdu(0.3s)').text
+        writer.writerow(['Open', Open])
+        
+        bid = soup.tr.next_sibling.next_sibling.find('span', class_='Trsdu(0.3s)').text
+        writer.writerow(['Bid', bid])
+        
+        ask = soup.tr.next_sibling.next_sibling.next_sibling.find('span', class_='Trsdu(0.3s)').text
+        writer.writerow(['Ask', ask])
+        
+        dayRange = soup.find(attrs={'data-test':'DAYS_RANGE-value'}).text
+        writer.writerow(["Day's Range", dayRange])
+        
+        wRange = soup.find(attrs={'data-test':'FIFTY_TWO_WK_RANGE-value'}).text
+        writer.writerow(['52 Week Range', wRange])
+        
+        vol = soup.find(attrs={'data-test':'TD_VOLUME-value'}).text
+        writer.writerow(['Volume', vol])
+        
+        avgVol = soup.find(attrs={'data-test':'AVERAGE_VOLUME_3MONTH-value'}).text
+        writer.writerow(['Avg. Volume', avgVol])
+        
+        mCap= soup.find(attrs={'data-test':'MARKET_CAP-value'}).text
+        writer.writerow(['Market Cap', mCap])
+        
+        beta = soup.find(attrs={'data-test':'BETA_5Y-value'}).text
+        writer.writerow(['Beta', beta])
+        
+        pe = soup.find(attrs={'data-test':'PE_RATIO-value'}).text
+        writer.writerow(['PE Ratio', pe])
+        
+        eps = soup.find(attrs={'data-test':'EPS_RATIO-value'}).text
+        writer.writerow(['EPS', eps])
+        
+        ed = soup.find(attrs={'data-test':'EARNINGS_DATE-value'}).text
+        writer.writerow(['Earnings Date', ed])
+        
+        fwdDiv = soup.find(attrs={'data-test':'DIVIDEND_AND_YIELD-value'}).text
+        writer.writerow(['Forward Dividend & Yield', fwdDiv])
+        
+        exDiv = soup.find(attrs={'data-test':'EX_DIVIDEND_DATE-value'}).text
+        writer.writerow(['Ex-Dividend Date', exDiv])
+        
+        yTEst = soup.find(attrs={'data-test':'ONE_YEAR_TARGET_PRICE-value'}).text
+        writer.writerow(['1y Target Est', yTEst])
 
-	body = soup.table.tbody
+def getAnalysis(ticker):
+    url = f'https://finance.yahoo.com/quote/{ticker}/analysis?p={ticker}'
+    r = requests.get(url, headers=header)
+    soup = BeautifulSoup(r.text, 'lxml')
+    
+    with open('analysis.csv', 'w', newline='') as file:
+        writer = csv.writer(file)
+        tables = soup.find_all('table')
+        for table in tables:
+            head = table.thead
+            body = table.tbody
+            headRows = head.find_all('tr')
+            bodyRows = body.find_all('tr')
+            for tr in headRows:
+                th = tr.find_all('th')
+                writer.writerow([i.text for i in th])
+            for tr in bodyRows:
+                td = tr.find_all('td')
+                writer.writerow([i.text for i in td])
 
-	time = body.tr.th
-	price = body.tr.td
+def getStats(ticker):
+    url = f'https://finance.yahoo.com/quote/{ticker}/key-statistics?p={ticker}'
+    r = requests.get(url, headers=header)
+    soup = BeautifulSoup(r.text, 'lxml')
+    
+    with open('stats.csv', 'w', newline='') as file:
+        writer = csv.writer(file)
+        
+        headRow = soup.table.thead.tr
+        th = headRow.find_all('th')
+        writer.writerow([i.text for i in th])
+        
+        tables = soup.find_all('table')
+        for table in tables:
+            body = table.tbody
+            bodyRows = body.find_all('tr')
+            for tr in bodyRows:
+                td = tr.find_all('td')
+                writer.writerow([i.text for i in td])
 
-	return price
 
-
-
-
-'''
-Functions to Produce:
-
--write individual data to csv
-
--function that returns last price on nasdaq
-'''
 
 if __name__ == "__main__":
+	
 	#getTopData(urls[2])
-	#lastStockPrice('TSLA')
-	#getIndivData('TSLA')
-	downloadHist(startY=1997, endM=4, endD=14)
-	dp = pd.read_csv('AMZNHistory.csv', parse_dates=True, index_col=0)
-	dp['Close'].plot()
-	plt.yscale('log')
-	plt.show()
+
+	#print(lastStockPrice('TSLA'))
+	#print(currentChange('TSLA'))
+
+	'''getSummary('AMZN')
+				getAnalysis('AMZN')
+				getStats('AMZN')'''
+	getHistory()
+	df = pd.read_csv('AMDHistory.csv')
+	
+
+	
 
