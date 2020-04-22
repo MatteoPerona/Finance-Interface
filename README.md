@@ -5,14 +5,15 @@
  
  import StockData as sd
  
-  # For Tables:
+  # For Yahoo Finance Filtered Ranking Tables:
  
   sd.getTopData(url)
   - the url entered must be a yfinance ranking table 
-  ex: 'https://finance.yahoo.com/most-active' (this url is also the default value)
+  - ex: 'https://finance.yahoo.com/most-active' (this url is also the default value)
+  - create your own yfinance filters and enter the url to get data as csv
  
  
-  # For Realtime Ticker Data:
+  # For Realtime Stock Data:
  
   sd.lastStockPrice(ticker)
   - enter a ticker (string)
@@ -27,7 +28,7 @@
   - get second by second price of given ticker written to csv
  
  
-  # For Individual Ticker Analysis:
+  # Yahoo Finance Analytics:
  
   sd.getHistory(ticker, startY=2015, startM=1, startD=1)
   - enter a ticker (string), start year (int), start month(int), and start dat(int)
