@@ -26,6 +26,11 @@
   sd.priceCollector(ticker)
   - enter a ticker (string)
   - get second by second price of given ticker written to csv
+  
+  sd.extrema(file)
+  - enter a csv file gnerated by priceCollector
+  - retruns a list of average up, ups standard deviation, average down, downs standard deviation 
+  - if there is not enough data to determine a standard devaition, (error: not enough data) is returned in place of the standard deviation values
  
  
   # Yahoo Finance Analytics:
