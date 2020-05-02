@@ -13,14 +13,14 @@ import pandas_datareader.data as web
 import csv
 
 
-
+#all default tables of yfinance rankings 
+#make your own screeners and use those urls
 urls = ['https://finance.yahoo.com/cryptocurrencies', 'https://finance.yahoo.com/trending-tickers', 'https://finance.yahoo.com/most-active'
 		, 'https://finance.yahoo.com/gainers', 'https://finance.yahoo.com/losers', 'https://finance.yahoo.com/etfs'
 		, 'https://finance.yahoo.com/commodities', 'https://finance.yahoo.com/world-indices', 'https://finance.yahoo.com/currencies'
 		, 'https://finance.yahoo.com/mutualfunds', 'https://finance.yahoo.com/options/highest-open-interest'
 		, 'https://finance.yahoo.com/options/highest-implied-volatility', 'https://finance.yahoo.com/bonds']
-#https://finance.yahoo.com/calendar
-#https://finance.yahoo.com/currency-converter
+
 
 header = {'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_11_6) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/61.0.3163.100 Safari/537.36'}
 
@@ -74,21 +74,88 @@ def currentChange(ticker):
     change = price.next_sibling
     return change.text
 
-def priceCollector(ticker):
-    now = dt.datetime.now()
-    hour = now.hour
-    minutes = now.minute
-    price = lastStockPrice(ticker)
-    with open(f'prices{ticker}.csv', 'w', newline='') as file:
+def priceCollector(ticker, hours, intervalSec, nameFile=False):
+    loop = 0
+    fname = 'prices.csv'
+    if nameFile:
+        fname=f'prices{ticker}.csv'
+        
+    with open(fname, 'w', newline='') as file:
         writer = csv.writer(file)
         writer.writerow(['Datetime', 'Price'])
-        while hour>=6 and minutes>=30 and hour<=9 and minutes>=30:
-            sleep(1)
+        
+        while loop <= hours*3600:
             now = dt.datetime.now()
-            hour = now.hour
-            minutes = now.minute
+            price = lastStockPrice(ticker)
             writer.writerow([now, price])
+            loop+=intervalSec
+            sleep(intervalSec)
 
+def extrema(file): #not secure
+    df = pd.read_csv(file)
+    extremes = []
+    percentsMax = []
+    percentsMin = []
+    
+    if priceNum(0,file)>priceNum(1,file) or priceNum(0,file)<priceNum(1,file):
+        extremes.append(priceNum(0,file))
+        print(priceNum(0, file))
+    
+    for x in range(1,len(df)):
+        if x==len(df)-1:
+            print(f'last: {x}')
+            if(extremes[len(extremes)-1]!= priceNum(x,file)):
+                print(f'appending: {priceNum(x,file)}')
+                extremes.append(priceNum(x,file))
+        else:  
+            if priceNum(x, file)==priceNum(x+1, file):
+                print('same value... continuing to nex value')
+                continue
+            elif priceNum(x-1, file)<=priceNum(x, file)>priceNum(x+1, file):
+                if priceNum(x, file)==priceNum(x+1, file):
+                    print('same value... continuing to nex value')
+                    continue
+                elif priceNum(x, file)>priceNum(x+1, file):
+                    print(f'appending {priceNum(x,file)} to extremes')
+                    extremes.append(priceNum(x,file))
+            elif priceNum(x-1, file)>=priceNum(x, file)<priceNum(x+1, file):
+                if priceNum(x, file)==priceNum(x+1, file):
+                    print('same value... continuing to nex value')
+                    continue
+                elif(priceNum(x, file)>priceNum(x+1, file)):
+                    print(f'appending {priceNum(x,file)} to extremes')
+                    extremes.append(priceNum(x,file))
+    
+    if(extremes[0]>extremes[1]):
+        percentsMax.append(extremes[0]/extremes[1])
+    else:
+        percentsMin.append(extremes[1]/extremes[0])
+            
+    for x in range(0,len(extremes)-2,2):
+        if extremes[x]<extremes[x+1]:
+            print(f'appending {extremes[x]<extremes[x+1]} to percentMax')
+            percentsMax.append(extremes[x+1]/extremes[x])
+        else:
+            print(f'appending {extremes[x+1]/extremes[x]} to percentMin')
+            percentsMin.append(-(extremes[x]/extremes[x+1]))
+    
+    maxStandardDev = 'error: not enough data'
+    minStandardDev = 'error: not enough data'
+    try:
+        maxStandardDev = stdev(percentsMax)
+        minStandardDev = stdev(percentsMin)
+    finally:
+        maxtot = 0
+        for p in percentsMax:
+            print(p)
+            maxtot+=p
+        mintot = 0
+        avgU = maxtot/len(percentsMax)
+        for p in percentsMin:
+            print(p)
+            mintot+=p
+        avgD = mintot/len(percentsMin)
+        return [avgU, maxStandardDev, avgD, minStandardDev]
 
 
 '''Functions that get individual data and write to csv'''
@@ -226,14 +293,18 @@ if __name__ == "__main__":
 	
 	#getTopData(urls[2])
 
-	print(lastStockPrice('gm'))
-	#print(currentChange('TSLA'))
+	#getFinancials('AMD')
+
+	#print(lastStockPrice('AMD'))
+	#print(currentChange('AMD'))
+	priceCollector('AMD', 4, 1)
 
 	'''getSummary('AMZN')
 				getAnalysis('AMZN')
 				getStats('AMZN')'''
 	#getHistory()
 	#df = pd.read_csv('AMDHistory.csv')
+
 
 
 	
